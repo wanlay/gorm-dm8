@@ -16,7 +16,7 @@ import (
 	"gorm.io/gorm/migrator"
 	"gorm.io/gorm/schema"
 
-	"github.com/encircles/gorm-dm8/clauses"
+	"github.com/wanlay/gorm-dm8/clauses"
 )
 
 type Config struct {

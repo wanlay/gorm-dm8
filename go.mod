@@ -1,4 +1,4 @@
-module github.com/encircles/gorm-dm8
+module github.com/wanlay/gorm-dm8
 
 go 1.17
 

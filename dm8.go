@@ -22,7 +22,7 @@ import (
 type Config struct {
 	DriverName        string
 	DSN               string
-	Conn              *sql.DB
+	Conn              gorm.ConnPool //*sql.DB
 	DefaultStringSize uint
 }
 

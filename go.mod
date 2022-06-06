@@ -3,10 +3,10 @@ module github.com/wanlay/gorm-dm8
 go 1.17
 
 require (
-	gitee.com/chunanyong/dm v1.8.3
+	gitee.com/chunanyong/dm v1.8.5
 	github.com/emirpasic/gods v1.12.0
 	github.com/thoas/go-funk v0.9.1
-	gorm.io/gorm v1.22.4
+	gorm.io/gorm v1.23.5
 )
 
 require (

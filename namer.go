@@ -1,15 +1,12 @@
-package dm8
+package dm
 
 import (
-	"strings"
-
 	"gorm.io/gorm/schema"
+	"strings"
 )
 
 type Namer struct {
 	schema.NamingStrategy
-	DmSchemaName   string
-	TableSpaceName string
 }
 
 func ConvertNameToFormat(x string) string {
@@ -18,10 +15,6 @@ func ConvertNameToFormat(x string) string {
 
 func (n Namer) TableName(table string) (name string) {
 	return ConvertNameToFormat(n.NamingStrategy.TableName(table))
-}
-
-func (n Namer) SchemaName(table string) string {
-	return ConvertNameToFormat(n.NamingStrategy.SchemaName(table))
 }
 
 func (n Namer) ColumnName(table, column string) (name string) {
@@ -41,5 +34,12 @@ func (n Namer) CheckerName(table, column string) (name string) {
 }
 
 func (n Namer) IndexName(table, column string) (name string) {
-	return ConvertNameToFormat(n.NamingStrategy.IndexName(table, column))
+	tlc := strings.ToLower(column)
+
+	cl := n.NamingStrategy.IndexName(table, column)
+	if strings.Contains(tlc, "idx_"+strings.ToLower(table)) && strings.Contains(tlc, strings.ToLower(column)) {
+		cl = column
+	}
+
+	return ConvertNameToFormat(cl)
 }

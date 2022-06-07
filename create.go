@@ -1,12 +1,12 @@
-package dm8
+package dm
 
 import (
 	"bytes"
 	"database/sql"
 	"reflect"
 
+	"github.com/jeyrce/gorm-dm8-driver/clauses"
 	"github.com/thoas/go-funk"
-	"github.com/wanlay/gorm-dm8/clauses"
 	"gorm.io/gorm"
 	"gorm.io/gorm/callbacks"
 	"gorm.io/gorm/clause"
@@ -14,10 +14,6 @@ import (
 )
 
 func Create(db *gorm.DB) {
-
-	// 可以获取表空间和模式名
-	namer := db.NamingStrategy.(Namer)
-
 	stmt := db.Statement
 	schema := stmt.Schema
 	boundVars := make(map[string]int)
@@ -37,11 +33,7 @@ func Create(db *gorm.DB) {
 	if stmt.SQL.String() == "" {
 		values := callbacks.ConvertToCreateValues(stmt)
 		onConflict, hasConflict := stmt.Clauses["ON CONFLICT"].Expression.(clause.OnConflict)
-		// are all columns in value the primary fields in schema only?
-		if hasConflict && funk.Contains(
-			funk.Map(values.Columns, func(c clause.Column) string { return c.Name }),
-			funk.Map(schema.PrimaryFields, func(field *gormSchema.Field) string { return field.DBName }),
-		) {
+		if hasConflict {
 			stmt.AddClauseIfNotExists(clauses.Merge{
 				Using: []clause.Interface{
 					clause.Select{
@@ -59,53 +51,44 @@ func Create(db *gorm.DB) {
 						}).([]clause.Column),
 					},
 					clause.From{
-						Tables: []clause.Table{{Name: db.Dialector.(Dialector).DummyTableName()}},
+						Tables: []clause.Table{{Name: "DUAL"}},
 					},
 				},
-				On: funk.Map(schema.PrimaryFields, func(field *gormSchema.Field) clause.Expression {
+				On: funk.Map(onConflict.Columns, func(field clause.Column) clause.Expression {
 					return clause.Eq{
-						Column: clause.Column{Table: stmt.Table, Name: field.DBName},
-						Value:  clause.Column{Table: clauses.MergeDefaultExcludeName(), Name: field.DBName},
+						Column: clause.Column{Table: stmt.Table, Name: field.Name},
+						Value:  clause.Column{Table: clauses.MergeDefaultExcludeName(), Name: field.Name},
 					}
 				}).([]clause.Expression),
 			})
+
 			stmt.AddClauseIfNotExists(clauses.WhenMatched{Set: onConflict.DoUpdates})
 			stmt.AddClauseIfNotExists(clauses.WhenNotMatched{Values: values})
 
 			stmt.Build("MERGE", "WHEN MATCHED", "WHEN NOT MATCHED")
 		} else {
-			// stmt.AddClauseIfNotExists(clause.Insert{Table: clause.Table{Name: stmt.Table}})
-			stmt.AddClauseIfNotExists(clause.Insert{Table: clause.Table{Name: namer.DmSchemaName + "." + stmt.Table}})
+			stmt.AddClauseIfNotExists(clause.Insert{Table: clause.Table{Name: stmt.Table}})
 			stmt.AddClause(clause.Values{Columns: values.Columns, Values: [][]interface{}{values.Values[0]}})
 			if hasDefaultValues {
-				// stmt.AddClauseIfNotExists(clause.Returning{
-				// 	Columns: funk.Map(schema.FieldsWithDefaultDBValue, func(field *gormSchema.Field) clause.Column {
-				// 		return clause.Column{Name: field.DBName}
-				// 	}).([]clause.Column),
-				// })
-
-				// stmt.AddClauseIfNotExists(clauses.ReturningInto{
-				// 	Variables: funk.Map(schema.FieldsWithDefaultDBValue, func(field *gormSchema.Field) clause.Column {
-				// 		return clause.Column{Name: field.DBName}
-				// 	}).([]clause.Column),
-				// })
+				stmt.AddClauseIfNotExists(clause.Returning{
+					Columns: funk.Map(schema.FieldsWithDefaultDBValue, func(field *gormSchema.Field) clause.Column {
+						return clause.Column{Name: field.DBName}
+					}).([]clause.Column),
+				})
 			}
-			stmt.Build("INSERT", "VALUES", "RETURNING")
-			// stmt.Build("INSERT", "VALUES")
-			if hasDefaultValues {
-				// stmt.WriteString(" INTO ")
-				// for _, field := range schema.FieldsWithDefaultDBValue {
-				// 	// if idx > 0 {
-				// 	// 	stmt.WriteByte(',')
-				// 	// }
-				//
-				// 	out := sql.Named(field.DBName, sql.Out{Dest: reflect.New(field.FieldType).Interface()})
-				// 	// out := sql.NamedArg{Name: field.DBName}
-				// 	boundVars[field.Name] = len(stmt.Vars)
-				// 	// stmt.AddVar(stmt, sql.Out{Dest: reflect.New(field.FieldType).Interface()})
-				// 	stmt.AddVar(stmt, out)
-				// }
-			}
+			stmt.Build("INSERT", "VALUES")
+			// 返回自增主键
+			// stmt.Build("INSERT", "VALUES", "RETURNING")
+			// if hasDefaultValues {
+			//	stmt.WriteString(" INTO ")
+			//	for idx, field := range schema.FieldsWithDefaultDBValue {
+			//		if idx > 0 {
+			//			stmt.WriteByte(',')
+			//		}
+			//		boundVars[field.Name] = len(stmt.Vars)
+			//		stmt.AddVar(stmt, sql.Out{Dest: reflect.New(field.FieldType).Interface()})
+			//	}
+			// }
 		}
 
 		if !db.DryRun {
@@ -123,70 +106,42 @@ func Create(db *gorm.DB) {
 
 					stmt.Vars[idx] = val
 				}
-				// stmt.SQL.WriteString(fmt.Sprintf(" STORAGE(ON \"%s\", CLUSTERBTR)", namer.TableSpaceName))
-				switch result, err := stmt.ConnPool.ExecContext(stmt.Context, stmt.SQL.String(), stmt.Vars...); err {
+				// and then we insert each row one by one then put the returning values back (i.e. last return id => smart insert)
+				// we keep track of the index so that the sub-reflected value is also correct
+
+				// BIG BUG: what if any of the transactions failed? some result might already be inserted that dm is so
+				// sneaky that some transaction inserts will exceed the buffer and so will be pushed at unknown point,
+				// resulting in dangling row entries, so we might need to delete them if an error happens
+
+				sqlStr := stmt.Explain(stmt.SQL.String(), stmt.Vars...)
+				switch result, err := stmt.ConnPool.ExecContext(stmt.Context, sqlStr, stmt.Vars...); err {
 				case nil: // success
 					db.RowsAffected, _ = result.RowsAffected()
 
-					if db.RowsAffected != 0 {
-
-						insertID, err := result.LastInsertId()
-						insertOk := err == nil && insertID > 0
-						if !insertOk {
-							db.AddError(err)
-							return
-						}
-
-						insertTo := stmt.ReflectValue
-						switch insertTo.Kind() {
-						case reflect.Slice, reflect.Array:
-							insertTo = insertTo.Index(idx)
-
-							// TODO 复合主键处理
-							if stmt.Schema.PrioritizedPrimaryField.HasDefaultValue {
-								switch insertTo.Kind() {
-								case reflect.Map:
-									// 如果是map的话，给map新增一个key value
-									insertTo.SetMapIndex(reflect.ValueOf(stmt.Schema.PrioritizedPrimaryField.DBName), reflect.ValueOf(insertID))
-								case reflect.Struct:
-									// 如果切片或数组内是结构体的话，就把自增id复制给主键
-									_, isZero := stmt.Schema.PrioritizedPrimaryField.ValueOf(stmt.Context, insertTo)
-									if isZero {
-										stmt.Schema.PrioritizedPrimaryField.Set(stmt.Context, insertTo, insertID)
-									}
-								}
-							}
-
-						case reflect.Map:
-							// 如果是map的话，给map新增一个key value
-							insertTo.SetMapIndex(reflect.ValueOf(stmt.Schema.PrioritizedPrimaryField.DBName), reflect.ValueOf(insertID))
-						case reflect.Struct:
-							_, isZero := stmt.Schema.PrioritizedPrimaryField.ValueOf(stmt.Context, insertTo)
-							if isZero {
-								stmt.Schema.PrioritizedPrimaryField.Set(stmt.Context, insertTo, insertID)
-							}
-						}
-
-						if hasDefaultValues {
-							// bind returning value back to reflected value in the respective fields
-							funk.ForEach(
-								funk.Filter(schema.FieldsWithDefaultDBValue, func(field *gormSchema.Field) bool {
-									return funk.Contains(boundVars, field.Name)
-								}),
-								func(field *gormSchema.Field) {
-									switch insertTo.Kind() {
-									case reflect.Struct:
-										if err = field.Set(stmt.Context, insertTo, stmt.Vars[boundVars[field.Name]].(sql.Out).Dest); err != nil {
-											db.AddError(err)
-										}
-									case reflect.Map:
-										// TODO 设置id的值
-									}
-								},
-							)
-						}
+					insertTo := stmt.ReflectValue
+					switch insertTo.Kind() {
+					case reflect.Slice, reflect.Array:
+						insertTo = insertTo.Index(idx)
 					}
 
+					if hasDefaultValues {
+						// bind returning value back to reflected value in the respective fields
+						funk.ForEach(
+							funk.Filter(schema.FieldsWithDefaultDBValue, func(field *gormSchema.Field) bool {
+								return funk.Contains(boundVars, field.Name)
+							}),
+							func(field *gormSchema.Field) {
+								switch insertTo.Kind() {
+								case reflect.Struct:
+									if err = field.Set(stmt.Context, insertTo, stmt.Vars[boundVars[field.Name]].(sql.Out).Dest); err != nil {
+										db.AddError(err)
+									}
+								case reflect.Map:
+									// todo 设置id的值
+								}
+							},
+						)
+					}
 				default: // failure
 					db.AddError(err)
 				}

@@ -1,17 +1,16 @@
-module github.com/wanlay/gorm-dm8
+module github.com/jeyrce/gorm-dm8-driver
 
 go 1.17
 
 require (
-	gitee.com/chunanyong/dm v1.8.5
-	github.com/emirpasic/gods v1.12.0
-	github.com/thoas/go-funk v0.9.1
+	github.com/emirpasic/gods v1.18.1
+	github.com/golang/snappy v0.0.4
+	github.com/thoas/go-funk v0.9.2
+	golang.org/x/text v0.3.7
 	gorm.io/gorm v1.23.5
 )
 
 require (
-	github.com/golang/snappy v0.0.4 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
-	github.com/jinzhu/now v1.1.4 // indirect
-	golang.org/x/text v0.3.7 // indirect
+	github.com/jinzhu/now v1.1.5 // indirect
 )

@@ -16,12 +16,12 @@ func (w WhenNotMatched) Name() string {
 func (w WhenNotMatched) Build(builder clause.Builder) {
 	if len(w.Columns) > 0 {
 		if len(w.Values.Values) != 1 {
-			panic("cannot insert more than one rows due to dm8 SQL language restriction")
+			panic("cannot insert more than one rows due to DM SQL language restriction")
 		}
 
 		builder.WriteString(" THEN")
 		builder.WriteString(" INSERT ")
-		w.Build(builder)
+		w.Values.Build(builder)
 
 		if len(w.Where.Exprs) > 0 {
 			builder.WriteString(w.Where.Name())
@@ -29,4 +29,9 @@ func (w WhenNotMatched) Build(builder clause.Builder) {
 			w.Where.Build(builder)
 		}
 	}
+}
+
+func (w WhenNotMatched) MergeClause(clause *clause.Clause) {
+	clause.Name = w.Name()
+	clause.Expression = w
 }

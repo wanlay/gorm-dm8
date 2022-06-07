@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jeyrce/gorm-dm8-driver/clauses"
-	_ "github.com/jeyrce/gorm-dm8-driver/dmr"
 	"github.com/thoas/go-funk"
+	"github.com/wanlay/gorm-dm8/clauses"
+	_ "github.com/wanlay/gorm-dm8/dmr"
 	"gorm.io/gorm"
 	"gorm.io/gorm/callbacks"
 	"gorm.io/gorm/clause"

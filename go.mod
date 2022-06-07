@@ -1,4 +1,4 @@
-module github.com/jeyrce/gorm-dm8-driver
+module github.com/wanlay/gorm-dm8
 
 go 1.17
 

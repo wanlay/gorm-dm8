@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/jeyrce/gorm-dm8-driver/dmr"
+	"github.com/wanlay/gorm-dm8/dmr"
 )
 
 type Clob string

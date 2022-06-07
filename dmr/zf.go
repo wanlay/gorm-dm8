@@ -12,7 +12,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/jeyrce/gorm-dm8-driver/dmr/util"
+	"github.com/wanlay/gorm-dm8/dmr/util"
 )
 
 const SQL_GET_DSC_EP_SITE = "SELECT " +

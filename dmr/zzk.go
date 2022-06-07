@@ -9,9 +9,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jeyrce/gorm-dm8-driver/dmr/util"
+	"github.com/wanlay/gorm-dm8/dmr/util"
 
-	"github.com/jeyrce/gorm-dm8-driver/dmr/parser"
+	"github.com/wanlay/gorm-dm8/dmr/parser"
 )
 
 func (dc *DmConnection) lex(sql string) ([]*parser.LVal, error) {

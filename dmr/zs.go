@@ -14,7 +14,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/jeyrce/gorm-dm8-driver/dmr/util"
+	"github.com/wanlay/gorm-dm8/dmr/util"
 )
 
 type oracleDateFormat struct {

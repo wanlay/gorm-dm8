@@ -8,7 +8,7 @@ Fork: **[https://github.com/nfjBill/gorm-driver-dm](https://github.com/nfjBill/g
 
 ```go
 import (
-  "github.com/jeyrce/gorm-dm8-driver"
+  "github.com/wanlay/gorm-dm8"
   "gorm.io/gorm"
 )
 
